@@ -1,177 +1,155 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Notion Spotify Player</title>
-    <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background: #1DB954; }
-        .player-container { background: white; padding: 20px; border-radius: 10px; max-width: 400px; margin: 0 auto; }
-        .controls { margin: 20px 0; text-align: center; }
-        button { background: #1DB954; color: white; border: none; padding: 10px 20px; margin: 5px; border-radius: 5px; cursor: pointer; }
-        button:hover { background: #1ed760; }
-        .track-info { margin: 15px 0; text-align: center; }
-        .playlist-list { margin: 10px 0; }
-        select { width: 100%; padding: 10px; margin: 10px 0; }
-        .status { margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 5px; }
-    </style>
+  <title>Notion Spotify Player</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #1DB954; }
+    .player-container { background: white; padding: 20px; border-radius: 10px; max-width: 400px; margin: 0 auto; }
+    .controls { margin: 20px 0; text-align: center; }
+    button { background: #1DB954; color: white; border: none; padding: 10px 20px; margin: 5px; border-radius: 5px; cursor: pointer; }
+    button:hover { background: #1ed760; }
+    .track-info { margin: 15px 0; text-align: center; }
+    .playlist-list { margin: 10px 0; }
+    select { width: 100%; padding: 10px; margin: 10px 0; }
+    .status { margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 5px; }
+  </style>
 </head>
 <body>
-    <div class="player-container">
-        <h2>🎵 Notion Spotify Player</h2>
-        
-        <div class="status" id="status">Ready to connect...</div>
-        
-        <div id="login-section">
-            <button onclick="login()">🎵 Connect to Spotify Premium</button>
-        </div>
-        
-        <div id="player-section" style="display: none;">
-            <div class="track-info">
-                <div id="track-info">No track playing</div>
-            </div>
-            
-            <div class="controls">
-                <button onclick="previousTrack()">⏮️ Previous</button>
-                <button onclick="togglePlay()" id="play-btn">▶️ Play</button>
-                <button onclick="nextTrack()">⏭️ Next</button>
-            </div>
-            
-            <div class="playlist-list">
-                <label><strong>Select Your Playlist:</strong></label>
-                <select id="playlist-select" onchange="loadPlaylist()">
-                    <option>Loading your playlists...</option>
-                </select>
-            </div>
-        </div>
+  <div class="player-container">
+    <h2>🎵 Notion Spotify Player</h2>
+    <div class="status" id="status">Ready to connect...</div>
+    <div id="login-section">
+      <button onclick="login()">🎵 Connect to Spotify Premium</button>
     </div>
+    <div id="player-section" style="display:none;">
+      <div class="track-info"><div id="track-info">No track playing</div></div>
+      <div class="controls">
+        <button onclick="previousTrack()">⏮️</button>
+        <button onclick="togglePlay()" id="play-btn">▶️</button>
+        <button onclick="nextTrack()">⏭️</button>
+      </div>
+      <div class="playlist-list">
+        <label><strong>Select Playlist:</strong></label>
+        <select id="playlist-select" onchange="loadPlaylist()">
+          <option>Loading playlists...</option>
+        </select>
+      </div>
+    </div>
+  </div>
 
-    <script src="https://sdk.scdn.co/spotify-player.js"></script>
-    <script>
-        // Your Client ID
-        const CLIENT_ID = '6ef98e0d97024c3bae9edc2a3bc5e0f4';
-        
-        // Your GitHub Pages URL with updated username
-        const REDIRECT_URI = 'https://hassanimran304.github.io/notion-spotify-player/callback.html';
-        
-        let player;
-        let access_token;
-        let device_id;
-        let is_paused = true;
-        
-        window.onload = function() {
-            access_token = localStorage.getItem('spotify_access_token');
-            if (access_token) {
-                document.getElementById('status').textContent = 'Found saved login, initializing...';
-                setTimeout(() => {
-                    if (window.Spotify) {
-                        initializePlayer();
-                    } else {
-                        document.getElementById('status').textContent = 'Waiting for Spotify SDK...';
-                    }
-                }, 1000);
-            }
-        };
-        
-        window.addEventListener('message', function(event) {
-            if (event.data.includes('access_token')) {
-                const urlParams = new URLSearchParams(event.data.substring(1));
-                access_token = urlParams.get('access_token');
-                localStorage.setItem('spotify_access_token', access_token);
-                
-                document.getElementById('status').textContent = 'Login successful! Initializing player...';
-                initializePlayer();
-            }
-        });
-        
-        window.onSpotifyWebPlaybackSDKReady = () => {
-            if (access_token) {
-                initializePlayer();
-            }
-        };
-        
-        function login() {
-            document.getElementById('status').textContent = 'Redirecting to Spotify login...';
-            const scope = 'streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state playlist-read-private';
-            const authUrl = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=token&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(scope)}`;
-            const popup = window.open(authUrl, 'spotify-auth', 'width=600,height=700');
-            if (!popup) {
-                document.getElementById('status').textContent = 'Popup blocked! Please allow popups and try again.';
-            }
-        }
-        
-        function initializePlayer() {
-            document.getElementById('status').textContent = 'Connecting to Spotify...';
-            player = new Spotify.Player({
-                name: 'Notion Spotify Player',
-                getOAuthToken: cb => { cb(access_token); },
-                volume: 0.5
-            });
-            player.addListener('ready', ({ device_id: ready_device_id }) => {
-                device_id = ready_device_id;
-                document.getElementById('status').textContent = '✅ Connected! Loading your playlists...';
-                document.getElementById('login-section').style.display = 'none';
-                document.getElementById('player-section').style.display = 'block';
-                loadUserPlaylists();
-            });
-            player.addListener('player_state_changed', (state) => {
-                if (!state) return;
-                const track = state.track_window.current_track;
-                const paused = state.paused;
-                document.getElementById('track-info').innerHTML = `<strong>${track.name}</strong><br>by ${track.artists[0].name}<br><em>from ${track.album.name}</em>`;
-                document.getElementById('play-btn').innerHTML = paused ? '▶️ Play' : '⏸️ Pause';
-                is_paused = paused;
-                document.getElementById('status').textContent = paused ? '⏸️ Paused' : '🎵 Now Playing';
-            });
-            player.addListener('initialization_error', ({ message }) => { document.getElementById('status').textContent = `❌ Error: ${message}`; });
-            player.addListener('authentication_error', ({ message }) => {
-                document.getElementById('status').textContent = `❌ Auth Error: ${message}`;
-                localStorage.removeItem('spotify_access_token');
-            });
-            player.connect();
-        }
-        
-        function togglePlay() { player.togglePlay(); }
-        function nextTrack() { player.nextTrack(); }
-        function previousTrack() { player.previousTrack(); }
-        
-        async function loadUserPlaylists() {
-            try {
-                const res = await fetch('https://api.spotify.com/v1/me/playlists?limit=50', {
-                    headers: { 'Authorization': `Bearer ${access_token}` }
-                });
-                const data = await res.json();
-                const select = document.getElementById('playlist-select');
-                select.innerHTML = '<option value="">Choose a playlist...</option>';
-                data.items.forEach(pl => {
-                    const opt = document.createElement('option');
-                    opt.value = pl.uri;
-                    opt.textContent = `${pl.name} (${pl.tracks.total} tracks)`;
-                    select.appendChild(opt);
-                });
-                document.getElementById('status').textContent = `✅ Loaded ${data.items.length} playlists. Select one to start!`;
-            } catch (e) {
-                console.error(e);
-                document.getElementById('status').textContent = '❌ Error loading playlists';
-            }
-        }
-        
-        async function loadPlaylist() {
-            const uri = document.getElementById('playlist-select').value;
-            if (!uri || !device_id) return;
-            document.getElementById('status').textContent = '🎵 Starting playlist...';
-            try {
-                await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${device_id}`, {
-                    method: 'PUT',
-                    body: JSON.stringify({ context_uri: uri }),
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${access_token}`
-                    },
-                });
-            } catch (e) {
-                console.error(e);
-                document.getElementById('status').textContent = '❌ Error playing playlist';
-            }
-        }
-    </script>
+  <script src="https://sdk.scdn.co/spotify-player.js"></script>
+  <script>
+    const CLIENT_ID = '6ef98e0d97024c3bae9edc2a3bc5e0f4';
+    const REDIRECT_URI = 'https://hassanimran304.github.io/notion-spotify-player/callback.html';
+
+    let player, access_token, device_id, is_paused=true;
+
+    // PKCE helper functions
+    function generateRandomString(len) {
+      const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+      const arr=window.crypto.getRandomValues(new Uint8Array(len));
+      return Array.from(arr).map(i=>chars[i%chars.length]).join('');
+    }
+    function base64urlencode(buffer) {
+      return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+        .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    }
+    async function generateCodeChallenge(verifier) {
+      const data=new TextEncoder().encode(verifier);
+      const digest=await crypto.subtle.digest('SHA-256',data);
+      return base64urlencode(digest);
+    }
+
+    // On load, check for saved token
+    window.onload=()=>{
+      access_token=localStorage.getItem('spotify_access_token');
+      if(access_token) setTimeout(initializePlayer,500);
+    };
+
+    // Listen for callback postMessage
+    window.addEventListener('message',e=>{
+      if(e.data.includes('access_token')) {
+        access_token=new URLSearchParams(e.data.substring(1)).get('access_token');
+        localStorage.setItem('spotify_access_token',access_token);
+        initializePlayer();
+      }
+    });
+
+    // Login with PKCE
+    async function login() {
+      const verifier=generateRandomString(128);
+      localStorage.setItem('spotify_pkce_verifier',verifier);
+      const challenge=await generateCodeChallenge(verifier);
+      const scope=[
+        'streaming','user-read-email','user-read-private',
+        'user-read-playback-state','user-modify-playback-state','playlist-read-private'
+      ].join(' ');
+      const authUrl=
+        'https://accounts.spotify.com/authorize'+
+        `?client_id=${CLIENT_ID}`+
+        `&response_type=code`+
+        `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`+
+        `&scope=${encodeURIComponent(scope)}`+
+        `&code_challenge_method=S256`+
+        `&code_challenge=${challenge}`;
+      window.location=authUrl;
+    }
+
+    // Initialize Spotify Web Playback SDK
+    window.onSpotifyWebPlaybackSDKReady=()=>access_token&&initializePlayer();
+
+    function initializePlayer(){
+      document.getElementById('status').textContent='Connecting...';
+      player=new Spotify.Player({
+        name:'Notion Spotify Player',
+        getOAuthToken:cb=>cb(access_token),volume:0.5
+      });
+      player.addListener('ready',({device_id:did})=>{
+        device_id=did;
+        document.getElementById('login-section').style.display='none';
+        document.getElementById('player-section').style.display='block';
+        document.getElementById('status').textContent='✅ Connected';
+        loadUserPlaylists();
+      });
+      player.addListener('player_state_changed',state=>{
+        if(!state)return;
+        const t=state.track_window.current_track;
+        document.getElementById('track-info').innerHTML=`<strong>${t.name}</strong><br>${t.artists[0].name}`;
+        const btn=document.getElementById('play-btn');
+        btn.textContent=state.paused?'▶️':'⏸️';
+      });
+      player.connect();
+    }
+
+    function togglePlay(){player.togglePlay();}
+    function nextTrack(){player.nextTrack();}
+    function previousTrack(){player.previousTrack();}
+
+    async function loadUserPlaylists(){
+      const res=await fetch('https://api.spotify.com/v1/me/playlists?limit=50',{
+        headers:{Authorization:`Bearer ${access_token}`}
+      });
+      const data=await res.json();
+      const sel=document.getElementById('playlist-select');
+      sel.innerHTML='<option value="">Choose...</option>';
+      data.items.forEach(pl=>{
+        const o=document.createElement('option');
+        o.value=pl.uri; o.textContent=`${pl.name} (${pl.tracks.total})`;
+        sel.appendChild(o);
+      });
+      document.getElementById('status').textContent='✅ Playlists Loaded';
+    }
+
+    async function loadPlaylist(){
+      const uri=document.getElementById('playlist-select').value;
+      if(!uri||!device_id)return;
+      document.getElementById('status').textContent='▶️ Playing';
+      await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${device_id}`,{
+        method:'PUT',
+        headers:{'Content-Type':'application/json',Authorization:`Bearer ${access_token}`},
+        body:JSON.stringify({context_uri:uri})
+      });
+    }
+  </script>
 </body>
 </html>
