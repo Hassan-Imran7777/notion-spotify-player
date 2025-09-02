@@ -52,7 +52,11 @@
       authUrl.searchParams.set('code_challenge_method', 'S256');
       authUrl.searchParams.set('code_challenge', challenge);
 
-      window.location = authUrl.toString();
+      window.open(
+        authUrl.toString(),
+        'spotify-auth',
+        'width=450,height=730'
+      );
     });
 
     // 2. Define global callback for Spotify SDK
@@ -85,6 +89,7 @@
         player.addListener('ready', ({ device_id }) => {
           console.log('Player ready on device', device_id);
           document.getElementById('status').innerText = 'Connected to Spotify';
+
           fetch('https://api.spotify.com/v1/me/player', {
             method: 'PUT',
             headers: {
