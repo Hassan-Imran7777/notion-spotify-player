@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Spotify Auth Callback</title>
+</head>
+<body>
+    <script>
+        // Extract token from URL and redirect to main player
+        const hash = window.location.hash;
+        if (hash) {
+            window.opener.postMessage(hash, '*');
+            window.close();
+        }
+    </script>
+</body>
+</html>
