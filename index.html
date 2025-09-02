@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <title>Notion Spotify Player</title>
-  <!-- Suppress missing favicon request -->
   <link rel="icon" href="data:;base64,iVBORw0KGgo=">
   <style>
     body { font-family: sans-serif; background: #f5f5f5; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
@@ -19,93 +18,70 @@
     <button id="connect">Connect to Spotify Premium</button>
   </div>
 
-  <!-- 1. PKCE + Connect logic -->
   <script>
-    function generateRandomString(length) {
-      const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-      let result = '';
-      const array = new Uint8Array(length);
-      crypto.getRandomValues(array);
-      array.forEach(c => result += charset[c % charset.length]);
-      return result;
+    // PKCE helpers
+    function generateRandomString(len) {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+      let s = '', arr = new Uint8Array(len);
+      crypto.getRandomValues(arr);
+      arr.forEach(c=>s+=chars[c%chars.length]);
+      return s;
     }
-    async function generateCodeChallenge(verifier) {
-      const data = new TextEncoder().encode(verifier);
-      const digest = await crypto.subtle.digest('SHA-256', data);
-      const bytes = new Uint8Array(digest);
-      let base64 = btoa(String.fromCharCode(...bytes));
-      return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    async function sha256(str) {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+      return new Uint8Array(buf);
+    }
+    async function codeChallenge(v) {
+      let hash = await sha256(v);
+      let b = btoa(String.fromCharCode(...hash));
+      return b.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
     }
 
     document.getElementById('connect').addEventListener('click', async () => {
       const clientId = '6ef98e0d97024c3bae9edc2a3bc5e0f4';
       const redirectUri = 'https://hassanimran304.github.io/notion-spotify-player/callback.html';
       const verifier = generateRandomString(128);
-      localStorage.setItem('spotify_pkce_verifier', verifier);
-      const challenge = await generateCodeChallenge(verifier);
+      const challenge = await codeChallenge(verifier);
+      // Encode the verifier in state
+      const state = encodeURIComponent(verifier);
 
-      const authUrl = new URL('https://accounts.spotify.com/authorize');
-      authUrl.searchParams.set('response_type', 'code');
-      authUrl.searchParams.set('client_id', clientId);
-      authUrl.searchParams.set('scope', 'streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state');
-      authUrl.searchParams.set('redirect_uri', redirectUri);
-      authUrl.searchParams.set('code_challenge_method', 'S256');
-      authUrl.searchParams.set('code_challenge', challenge);
+      const url = new URL('https://accounts.spotify.com/authorize');
+      url.searchParams.set('response_type','code');
+      url.searchParams.set('client_id',clientId);
+      url.searchParams.set('scope','streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state');
+      url.searchParams.set('redirect_uri',redirectUri);
+      url.searchParams.set('code_challenge_method','S256');
+      url.searchParams.set('code_challenge',challenge);
+      url.searchParams.set('state',state);
 
-      window.open(
-        authUrl.toString(),
-        'spotify-auth',
-        'width=450,height=730'
-      );
+      // Open as popup
+      window.open(url.toString(), 'spotify-auth','width=450,height=730');
     });
 
-    // 2. Define global callback for Spotify SDK
+    // Spotify SDK ready callback
     function onSpotifyWebPlaybackSDKReady() {
-      window.addEventListener('message', function(e) {
-        if (typeof e.data !== 'string') return;
-        if (!e.data.startsWith('#access_token=')) return;
-
-        const token = e.data.replace('#access_token=', '');
+      window.addEventListener('message', e => {
+        if (typeof e.data !== 'string' || !e.data.startsWith('#access_token=')) return;
+        const token = e.data.replace('#access_token=','');
         document.getElementById('status').innerText = 'Player initializing…';
-
         const player = new Spotify.Player({
-          name: 'Notion Music Player',
-          getOAuthToken: cb => cb(token)
+          name:'Notion Music Player',
+          getOAuthToken: cb=>cb(token)
         });
-
-        player.addListener('initialization_error', ({ message }) => {
-          console.error('Init error:', message);
-          document.getElementById('status').innerText = 'Initialization error';
-        });
-        player.addListener('authentication_error', ({ message }) => {
-          console.error('Auth error:', message);
-          document.getElementById('status').innerText = 'Authentication error';
-        });
-        player.addListener('account_error', ({ message }) => {
-          console.error('Account error:', message);
-          document.getElementById('status').innerText = 'Account error';
-        });
-
-        player.addListener('ready', ({ device_id }) => {
-          console.log('Player ready on device', device_id);
-          document.getElementById('status').innerText = 'Connected to Spotify';
-
-          fetch('https://api.spotify.com/v1/me/player', {
-            method: 'PUT',
-            headers: {
-              'Authorization': 'Bearer ' + token,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ device_ids: [device_id] })
+        player.addListener('initialization_error',({message})=>document.getElementById('status').innerText='Initialization error');
+        player.addListener('authentication_error',({message})=>document.getElementById('status').innerText='Authentication error');
+        player.addListener('account_error',({message})=>document.getElementById('status').innerText='Account error');
+        player.addListener('ready',({device_id})=>{
+          document.getElementById('status').innerText='Connected to Spotify';
+          fetch('https://api.spotify.com/v1/me/player',{method:'PUT',
+            headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+            body:JSON.stringify({device_ids:[device_id]})
           });
         });
-
         player.connect();
       });
     }
   </script>
-
-  <!-- 3. Load the Spotify Web Playback SDK -->
   <script src="https://sdk.scdn.co/spotify-player.js"></script>
 </body>
 </html>
