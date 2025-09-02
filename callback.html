@@ -1,28 +1,19 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Spotify Auth Callback</title>
-</head>
+<head><title>Spotify Auth Callback</title></head>
 <body>
   <script>
     (async () => {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get('code');
+      const p = new URLSearchParams(window.location.search);
+      const code = p.get('code');
       if (!code) {
         document.body.innerHTML = '❌ No code found in URL';
         return;
       }
-
       const verifier = localStorage.getItem('spotify_pkce_verifier');
-      if (!verifier) {
-        document.body.innerHTML = '❌ No PKCE verifier found';
-        return;
-      }
-
-      // Exchange authorization code for tokens via public proxy
-      const response = await fetch('https://spotify-pkce-proxy.vercel.app/api/exchange', {
+      const res = await fetch('https://spotify-pkce-proxy.vercel.app/api/exchange', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {'Content-Type':'application/json'},
         body: JSON.stringify({
           client_id: '6ef98e0d97024c3bae9edc2a3bc5e0f4',
           code,
@@ -30,13 +21,12 @@
           code_verifier: verifier
         })
       });
-
-      const data = await response.json();
+      const data = await res.json();
       if (data.access_token) {
         window.opener.postMessage('#access_token=' + data.access_token, '*');
         window.close();
       } else {
-        document.body.innerHTML = '❌ Token exchange failed: ' + JSON.stringify(data);
+        document.body.innerHTML = '❌ Token exchange failed';
       }
     })();
   </script>
