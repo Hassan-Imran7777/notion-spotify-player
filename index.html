@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <title>Notion Spotify Player</title>
-  <script src="https://sdk.scdn.co/spotify-player.js"></script>
   <style>
     body { font-family: sans-serif; background: #f5f5f5; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
     .player { background: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center; }
@@ -19,7 +18,7 @@
   </div>
 
   <script>
-    // Generate PKCE code challenge helpers
+    // 1) PKCE helpers (same as before)
     function generateRandomString(length) {
       const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
       let result = '';
@@ -34,12 +33,11 @@
     }
     async function generateCodeChallenge(verifier) {
       const hashed = await sha256(verifier);
-      // Base64-urlencode
       return btoa(String.fromCharCode(...hashed))
         .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     }
 
-    // Start PKCE flow when user clicks Connect
+    // 2) Start PKCE flow
     document.getElementById('connect').addEventListener('click', async () => {
       const clientId = '6ef98e0d97024c3bae9edc2a3bc5e0f4';
       const redirectUri = 'https://hassanimran304.github.io/notion-spotify-player/callback.html';
@@ -56,52 +54,54 @@
       window.location = authUrl.toString();
     });
 
-    // Listen for access token from callback via postMessage
-    window.addEventListener('message', e => {
-      if (typeof e.data !== 'string') return;
-      if (!e.data.startsWith('#access_token=')) return;
-      const accessToken = e.data.replace('#access_token=', '');
-      console.log('Received access token:', accessToken);
-      document.getElementById('status').innerText = 'Player initializing…';
+    // 3) Handle messages & define SDK-ready callback
+    window.onSpotifyWebPlaybackSDKReady = () => {
+      // Listen for access token from callback
+      window.addEventListener('message', e => {
+        if (typeof e.data !== 'string') return;
+        if (!e.data.startsWith('#access_token=')) return;
+        const accessToken = e.data.replace('#access_token=', '');
+        document.getElementById('status').innerText = 'Player initializing…';
 
-      // Initialize Spotify Web Playback SDK
-      const player = new Spotify.Player({
-        name: 'Notion Music Player',
-        getOAuthToken: cb => { cb(accessToken); }
-      });
-
-      // Error handling
-      player.addListener('initialization_error', ({ message }) => {
-        console.error('Init error:', message);
-        document.getElementById('status').innerText = 'Initialization error';
-      });
-      player.addListener('authentication_error', ({ message }) => {
-        console.error('Auth error:', message);
-        document.getElementById('status').innerText = 'Authentication error';
-      });
-      player.addListener('account_error', ({ message }) => {
-        console.error('Account error:', message);
-        document.getElementById('status').innerText = 'Account error';
-      });
-
-      // Ready
-      player.addListener('ready', ({ device_id }) => {
-        console.log('Player ready on device', device_id);
-        document.getElementById('status').innerText = 'Connected to Spotify';
-        // Optionally transfer playback to this device
-        fetch('https://api.spotify.com/v1/me/player', {
-          method: 'PUT',
-          headers: {
-            'Authorization': 'Bearer ' + accessToken,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ device_ids: [device_id] })
+        // Create the player
+        const player = new Spotify.Player({
+          name: 'Notion Music Player',
+          getOAuthToken: cb => { cb(accessToken); }
         });
-      });
 
-      // Connect
-      player.connect();
-    });
+        // Errors
+        player.addListener('initialization_error', ({ message }) => {
+          console.error('Init error:', message);
+          document.getElementById('status').innerText = 'Initialization error';
+        });
+        player.addListener('authentication_error', ({ message }) => {
+          console.error('Auth error:', message);
+          document.getElementById('status').innerText = 'Authentication error';
+        });
+        player.addListener('account_error', ({ message }) => {
+          console.error('Account error:', message);
+          document.getElementById('status').innerText = 'Account error';
+        });
+
+        // Ready
+        player.addListener('ready', ({ device_id }) => {
+          console.log('Player ready on device', device_id);
+          document.getElementById('status').innerText = 'Connected to Spotify';
+          // Transfer playback
+          fetch('https://api.spotify.com/v1/me/player', {
+            method: 'PUT',
+            headers: {
+              'Authorization': 'Bearer ' + accessToken,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ device_ids: [device_id] })
+          });
+        });
+
+        player.connect();
+      });
+    };
   </script>
+  <script src="https://sdk.scdn.co/spotify-player.js"></script>
 </body>
 </html>
