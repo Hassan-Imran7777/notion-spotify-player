@@ -1,39 +1,39 @@
 <!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>Spotify Auth Callback</title></head>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Spotify Auth Callback</title>
+</head>
 <body>
   <script>
-    (async () => {
+    (async()=>{
       const params = new URLSearchParams(window.location.search);
-      const code  = params.get('code');
-      if (!code) {
-        document.body.innerText = '❌ No "code" in URL—authorization failed.';
+      const code = params.get('code');
+      const state = params.get('state');      // contains our PKCE verifier
+      if (!code || !state) {
+        document.body.innerText = '❌ Missing code or state.';
         return;
       }
-      const verifier = localStorage.getItem('spotify_pkce_verifier');
-      if (!verifier) {
-        document.body.innerText = '❌ No PKCE verifier found in localStorage.';
-        return;
-      }
-      // Exchange authorization code for token via our proxy
-      const resp = await fetch('https://spotify-pkce-proxy.vercel.app/api/exchange', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({
-          client_id: '6ef98e0d97024c3bae9edc2a3bc5e0f4',
-          grant_type: 'authorization_code',
-          code,
-          redirect_uri: 'https://hassanimran304.github.io/notion-spotify-player/callback.html',
-          code_verifier: verifier
+      const verifier = decodeURIComponent(state);
+
+      // Exchange via our CORS proxy
+      const resp = await fetch('https://spotify-pkce-proxy.vercel.app/api/exchange',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          client_id:'6ef98e0d97024c3bae9edc2a3bc5e0f4',
+          grant_type:'authorization_code',
+          code:code,
+          redirect_uri:'https://hassanimran304.github.io/notion-spotify-player/callback.html',
+          code_verifier:verifier
         })
       });
       const data = await resp.json();
       if (data.access_token) {
-        // Send back to opener (Notion embed) and close
-        window.opener.postMessage('#access_token=' + data.access_token, '*');
+        window.opener.postMessage('#access_token='+data.access_token,'*');
         window.close();
       } else {
-        document.body.innerText = '❌ Token exchange failed: ' + JSON.stringify(data);
+        document.body.innerText = '❌ Token exchange failed: '+JSON.stringify(data);
       }
     })();
   </script>
